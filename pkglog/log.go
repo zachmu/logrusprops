@@ -49,16 +49,22 @@ func InitFromFile(configFile string) {
 
 	// We need the lowest level possible or our hook won't be invoked on all log messages
 	logrus.SetLevel(logrus.TraceLevel)
-
 	logrus.SetOutput(io.Discard)
+
 	// clear hooks before adding ours, we only want one
 	logrus.StandardLogger().Hooks = make(logrus.LevelHooks)
-	logrus.AddHook(Hook{props: props, level: level})
+	logWriter, err := os.Create("output.log")
+	if err != nil {
+		panic(err)
+	}
+
+	logrus.AddHook(Hook{props: props, level: level, wr: logWriter})
 }
 
 type Hook struct {
 	props *properties.Properties
 	level logrus.Level
+	wr    io.Writer
 }
 
 var _ logrus.Hook = (*Hook)(nil)
@@ -86,13 +92,13 @@ func (p Hook) Fire(entry *logrus.Entry) error {
 	if !ok {
 		if entry.Level <= p.level {
 			format, _ := formatter.Format(entry)
-			os.Stderr.Write(format)
+			p.wr.Write(format)
 		}
 	} else {
 		if level, err := logrus.ParseLevel(loglevel); err == nil {
 			if entry.Level <= level {
 				format, _ := formatter.Format(entry)
-				os.Stderr.Write(format)
+				p.wr.Write(format)
 			}
 		}
 	}
